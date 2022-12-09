@@ -13,27 +13,112 @@ func main() {
     let lines = inputString.components(separatedBy: "\n")
         .filter { !$0.isEmpty }
     
-    // Sample algorithm
-    var scoreboard = [String: Int]()
-    lines.forEach { line in
-        let (name, score) = parseLine(line)
-        scoreboard[name] = score
+    let root = File(name: "/", size: 0, isDirectory: true)
+    var currentDirectory = root
+    
+    for line in lines {
+        if line.hasPrefix("$") { // command
+            if let newDirectory = parseCommand(line: line, currentDirectory: currentDirectory, rootDirectory: root) {
+                currentDirectory = newDirectory
+            }
+        } else if line.hasPrefix("dir") { // directory
+            currentDirectory.files.append(parseDirectory(line: line, currentDirectory: currentDirectory))
+        } else { // file
+            currentDirectory.files.append(parseFile(line: line))
+        }
     }
-    scoreboard
-        .sorted { lhs, rhs in
-            lhs.value > rhs.value
-        }
-        .forEach { name, score in
-            print("\(name) \(score) pts")
-        }
+    
+    calculateSize(root)
+    customPrint(root)
+    
+    maxTotalSize(root, limit: 100000)
+    print(counter)
 }
 
-func parseLine(_ line: String) -> (name: String, score: Int) {
-    let helper = RegexHelper(pattern: #"([\-\w]*)\s(\d+)"#)
+@discardableResult
+func calculateSize(_ file: File) -> Int {
+    if file.files.isEmpty {
+        return file.size
+    }
+    let size = file.files.reduce(0) { partialResult, currentFile in
+        partialResult + calculateSize(currentFile)
+    }
+    file.size = size
+    return size
+}
+
+func customPrint(_ directory: File, currentIndent: Int = 0) {
+    let indent = String(Array(repeating: " ", count: currentIndent))
+    let size = directory.isDirectory ? "[\(directory.size)]": "\(directory.size)"
+    print("\(indent)\(directory.name) \(size)")
+    if directory.files.isEmpty {
+        return
+    }
+    for file in directory.files {
+        customPrint(file, currentIndent: currentIndent + 2)
+    }
+}
+
+var counter = 0
+
+func maxTotalSize(_ directory: File, limit: Int) {
+    if directory.isDirectory && directory.size < limit { counter += directory.size }
+    if directory.files.isEmpty {
+        return
+    }
+    for file in directory.files {
+        maxTotalSize(file, limit: limit)
+    }
+}
+
+func parseCommand(line: String, currentDirectory: File, rootDirectory: File) -> File? {
+    if line == "$ ls" { return nil }
+    let helper = RegexHelper(pattern: #"\$\s(\w+)\s(.*)"#)
+    let result = helper.parse(line)
+    let command = result[0]
+    guard command == "cd" else { return nil }
+    let newDirectory = result[1]
+    switch newDirectory {
+    case "..":
+        return currentDirectory.parent
+    case "/":
+        return rootDirectory
+    default:
+        let targetDirectory = currentDirectory.files.filter { $0.name == newDirectory }.first
+        if let targetDirectory { return targetDirectory }
+        fatalError("No such directory: \(newDirectory)")
+    }
+}
+
+func parseFile(line: String) -> File {
+    let helper = RegexHelper(pattern: #"(\d+)\s(.*)"#)
+    let result = helper.parse(line)
+    let size = Int(result[0])!
+    let name = result[1]
+    return File(name: name, size: size)
+}
+
+func parseDirectory(line: String, currentDirectory: File) -> File {
+    let helper = RegexHelper(pattern: #"dir\s(.*)"#)
     let result = helper.parse(line)
     let name = result[0]
-    let score = Int(result[1])!
-    return (name: name, score: score)
+    return File(name: name, size: 0, isDirectory: true, parent: currentDirectory)
 }
 
 main()
+
+class File {
+    var name: String
+    var size: Int
+    var isDirectory: Bool
+    var parent: File?
+    var files: [File]
+    
+    init(name: String, size: Int, isDirectory: Bool = false, parent: File? = nil, files: [File] = []) {
+        self.name = name
+        self.size = size
+        self.isDirectory = isDirectory
+        self.parent = parent
+        self.files = files
+    }
+}
