@@ -29,10 +29,22 @@ func main() {
     }
     
     calculateSize(root)
-    customPrint(root)
+//    customPrint(root)
     
-    maxTotalSize(root, limit: 100000)
-    print(counter)
+//    maxTotalSize(root, limit: 100000)
+//    print(counter)
+    
+    let totalSpace = 70000000
+    let updateSpace = 30000000
+    let usedSpace = root.size
+    let neededSpace = updateSpace - (totalSpace - usedSpace)
+    
+    print(neededSpace)
+    
+    currentCandidate = root.size
+    findDirectoryToDelete(root, targetSpace: neededSpace)
+    
+    print(currentCandidate)
 }
 
 @discardableResult
@@ -59,15 +71,26 @@ func customPrint(_ directory: File, currentIndent: Int = 0) {
     }
 }
 
-var counter = 0
+var counter = 0 // part 1
+var currentCandidate = 0 // part 2
 
-func maxTotalSize(_ directory: File, limit: Int) {
+func maxTotalSize(_ directory: File, limit: Int) { // part 1
     if directory.isDirectory && directory.size < limit { counter += directory.size }
     if directory.files.isEmpty {
         return
     }
     for file in directory.files {
         maxTotalSize(file, limit: limit)
+    }
+}
+
+func findDirectoryToDelete(_ directory: File, targetSpace: Int) { // part 2
+    if directory.isDirectory && directory.size > targetSpace && directory.size < currentCandidate { currentCandidate = directory.size }
+    if directory.files.isEmpty {
+        return
+    }
+    for file in directory.files {
+        findDirectoryToDelete(file, targetSpace: targetSpace)
     }
 }
 
